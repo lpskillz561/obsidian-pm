@@ -68,6 +68,13 @@ export class TaskModal extends Modal {
     contentEl.empty()
     contentEl.addClass('pm-task-modal')
     this.modalEl.addClass('pm-modal', 'pm-modal--task')
+    // The editor draws its own close button in the header row, so drop Obsidian's
+    // native corner one to avoid two X's. Modal renamed that button's class from
+    // .modal-close-button to .modal-header-button (it is .modal-header-button as
+    // of 1.13); minAppVersion is 1.7.2, so clear whichever one this app built.
+    this.modalEl.querySelectorAll('.modal-close-button, .modal-header-button').forEach((el) => {
+      el.remove()
+    })
     this.render()
   }
 

@@ -7,7 +7,7 @@ export type GanttGranularity = 'day' | 'week' | 'month' | 'quarter'
 export type GanttWeekLabel = 'weekNumber' | 'dateRange' | 'both'
 export type ViewMode = 'table' | 'gantt' | 'kanban'
 export type DueDateFilter = 'any' | 'overdue' | 'this-week' | 'this-month' | 'no-date'
-export type TaskType = 'task' | 'milestone' | 'subtask'
+export type TaskType = 'task' | 'bug' | 'milestone' | 'subtask'
 
 export interface Recurrence {
   interval: 'daily' | 'weekly' | 'monthly' | 'yearly'

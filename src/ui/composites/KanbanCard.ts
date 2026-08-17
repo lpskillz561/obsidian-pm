@@ -51,6 +51,14 @@ export class KanbanCard {
         .setColor('var(--color-purple)')
         .setTooltip('Milestone')
     }
+    if (task.type === 'bug') {
+      new Chip(titleRow)
+        .setLabel('Bug')
+        .setVariant('solid')
+        .setSize('sm')
+        .setColor('var(--color-red)')
+        .setTooltip('Bug')
+    }
     if (task.type === 'subtask') {
       new Chip(titleRow)
         .setLabel('Sub')

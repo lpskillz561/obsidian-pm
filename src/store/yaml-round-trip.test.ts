@@ -95,6 +95,20 @@ describe('task round-trip', () => {
     expect(task.due).toBe('2026-05-01')
   })
 
+  it('preserves a bug type through a round trip', () => {
+    const original = makeTask({ id: 'b-1', type: 'bug', start: '2026-05-01', due: '2026-05-08' })
+    const { task } = roundTripTask(original)
+    expect(task.type).toBe('bug')
+    expect(task.start).toBe('2026-05-01')
+    expect(task.due).toBe('2026-05-08')
+  })
+
+  it('falls back to a plain task for an unrecognised type', () => {
+    const original = makeTask({ id: 'x-1', type: 'nonsense' as Task['type'] })
+    const { task } = roundTripTask(original)
+    expect(task.type).toBe('task')
+  })
+
   it('preserves custom field values', () => {
     const original = makeTask({
       id: 'task-3',

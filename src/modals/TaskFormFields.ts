@@ -27,6 +27,7 @@ export interface TaskFormFieldsContext {
 
 const TYPE_OPTIONS: SelectItem[] = [
   { id: 'task', label: 'Task', icon: 'square-check-big' },
+  { id: 'bug', label: 'Bug', icon: 'bug' },
   { id: 'subtask', label: 'Subtask', icon: 'git-branch' },
   { id: 'milestone', label: 'Milestone', icon: 'diamond' }
 ]

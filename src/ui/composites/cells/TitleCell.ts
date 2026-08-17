@@ -52,7 +52,7 @@ export class TitleCell {
         .setTooltip('Milestone')
     }
     if (task.type === 'bug') {
-      new Chip(inner).setLabel('Bug').setVariant('solid').setSize('sm').setColor('var(--color-red)').setTooltip('Bug')
+      new Chip(this.el).setLabel('Bug').setVariant('solid').setSize('sm').setColor('var(--color-red)').setTooltip('Bug')
     }
     if (task.type === 'subtask') {
       new Chip(this.el)

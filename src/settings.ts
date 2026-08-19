@@ -1,7 +1,32 @@
 import { App, PluginSettingTab, Setting, Notice } from 'obsidian'
 import type PMPlugin from './main'
 import { PMSettings, DEFAULT_SETTINGS, makeId } from './types'
+import { DEFAULT_CALENDAR_COLORS, makeSourceId } from './calendar/types'
+import { localTimeZone } from './calendar/ics'
 import { flattenTasks } from './store/TaskTreeOps'
+
+/** A short, sensible fallback for runtimes without `Intl.supportedValuesOf`. */
+const FALLBACK_TIME_ZONES = [
+  'America/New_York',
+  'America/Chicago',
+  'America/Denver',
+  'America/Phoenix',
+  'America/Los_Angeles',
+  'UTC',
+  'Europe/London',
+  'Europe/Berlin',
+  'Asia/Tokyo',
+  'Australia/Sydney'
+]
+
+function supportedTimeZones(): string[] {
+  const intl = Intl as typeof Intl & { supportedValuesOf?: (key: string) => string[] }
+  try {
+    return intl.supportedValuesOf?.('timeZone') ?? FALLBACK_TIME_ZONES
+  } catch {
+    return FALLBACK_TIME_ZONES
+  }
+}
 
 export type { PMSettings }
 export { DEFAULT_SETTINGS }
@@ -117,6 +142,188 @@ export class PMSettingTab extends PluginSettingTab {
         })
       )
 
+    // ── Home page ─────────────────────────────────────────────────────────────
+    new Setting(containerEl).setName('Home page').setHeading()
+
+    new Setting(containerEl)
+      .setName('Open home at startup')
+      .setDesc('Open the home page automatically when Obsidian starts.')
+      .addToggle((t) =>
+        t.setValue(this.plugin.settings.openHomeOnStartup).onChange(async (v) => {
+          this.plugin.settings.openHomeOnStartup = v
+          await this.plugin.saveSettings()
+        })
+      )
+
+    new Setting(containerEl)
+      .setName('Greeting name')
+      .setDesc('Shown in the home page greeting. Leave empty to greet without a name.')
+      .addText((text) =>
+        text
+          .setPlaceholder('Jarrett')
+          .setValue(this.plugin.settings.homeGreetingName)
+          .onChange(async (v) => {
+            this.plugin.settings.homeGreetingName = v.trim()
+            await this.plugin.saveSettings()
+          })
+      )
+
+    new Setting(containerEl)
+      .setName('Agenda days')
+      .setDesc('How many days of agenda to show, starting today.')
+      .addSlider((sl) =>
+        sl
+          .setLimits(1, 7, 1)
+          .setValue(this.plugin.settings.homeAgendaDays)
+          .setDynamicTooltip()
+          .onChange(async (v) => {
+            this.plugin.settings.homeAgendaDays = v
+            await this.plugin.saveSettings()
+          })
+      )
+
+    new Setting(containerEl)
+      .setName('Show tasks panel')
+      .setDesc('Overdue, due today and in-progress tasks from your projects.')
+      .addToggle((t) =>
+        t.setValue(this.plugin.settings.homeShowTasks).onChange(async (v) => {
+          this.plugin.settings.homeShowTasks = v
+          await this.plugin.saveSettings()
+        })
+      )
+
+    new Setting(containerEl)
+      .setName('Show notes panel')
+      .setDesc('Pinned and recently edited notes.')
+      .addToggle((t) =>
+        t.setValue(this.plugin.settings.homeShowNotes).onChange(async (v) => {
+          this.plugin.settings.homeShowNotes = v
+          await this.plugin.saveSettings()
+        })
+      )
+
+    new Setting(containerEl)
+      .setName('Show board')
+      .setDesc('Embed a project board across the full width of the home page.')
+      .addToggle((t) =>
+        t.setValue(this.plugin.settings.homeShowKanban).onChange(async (v) => {
+          this.plugin.settings.homeShowKanban = v
+          await this.plugin.saveSettings()
+        })
+      )
+
+    new Setting(containerEl)
+      .setName('Board project')
+      .setDesc('Which project’s board appears on the home page.')
+      .addDropdown((dd) => {
+        dd.addOption('', 'None')
+        dd.setValue(this.plugin.settings.homeKanbanProject)
+        dd.onChange(async (v) => {
+          this.plugin.settings.homeKanbanProject = v
+          await this.plugin.saveSettings()
+        })
+        // Projects load from disk; fill the list in once it resolves and re-apply the
+        // saved value, since setValue before the options exist would be dropped.
+        void (async () => {
+          const projects = await this.plugin.store.loadAllProjects(this.plugin.settings.projectsFolder)
+          for (const p of projects) dd.addOption(p.filePath, p.title)
+          dd.setValue(this.plugin.settings.homeKanbanProject)
+        })()
+      })
+
+    // ── Calendars ─────────────────────────────────────────────────────────────
+    new Setting(containerEl).setName('Calendars').setHeading()
+
+    containerEl.createEl('p', {
+      cls: 'pm-settings-desc',
+      text:
+        'Subscribe to read-only iCal feeds. In Google Calendar use Settings → "Secret address in iCal format"; ' +
+        'in Outlook use "Publish a calendar" and copy the ICS link.'
+    })
+    containerEl.createEl('p', {
+      cls: 'pm-settings-desc pm-settings-desc--warn',
+      text:
+        'These URLs are credentials — anyone who has one can read the calendar. They are stored in this ' +
+        "plugin's data.json inside the vault, so they travel with any vault sync or backup."
+    })
+
+    const calendarContainer = containerEl.createDiv('pm-settings-calendars')
+    this.renderCalendarList(calendarContainer)
+
+    new Setting(containerEl).addButton((btn) =>
+      btn
+        .setButtonText('+ add calendar')
+        .setCta()
+        .onClick(() => {
+          const sources = this.plugin.settings.calendarSources
+          sources.push({
+            id: makeSourceId(),
+            name: sources.length === 0 ? 'Work' : 'Personal',
+            url: '',
+            color: DEFAULT_CALENDAR_COLORS[sources.length % DEFAULT_CALENDAR_COLORS.length],
+            enabled: true
+          })
+          void this.plugin.saveSettings()
+          this.renderCalendarList(calendarContainer)
+        })
+    )
+
+    new Setting(containerEl)
+      .setName('Display timezone')
+      .setDesc(
+        'Timezone the agenda is shown in. Meetings keep the organiser’s timezone in the feed, ' +
+          'so set this to see every meeting on your own clock.'
+      )
+      .addDropdown((dd) => {
+        dd.addOption('', `System default (${localTimeZone()})`)
+        for (const zone of supportedTimeZones()) dd.addOption(zone, zone.replace(/_/g, ' '))
+        dd.setValue(this.plugin.settings.calendarTimeZone)
+        dd.onChange(async (v) => {
+          this.plugin.settings.calendarTimeZone = v
+          await this.plugin.saveSettings()
+        })
+      })
+
+    new Setting(containerEl)
+      .setName('Refresh every (minutes)')
+      .setDesc('How often to re-fetch the feeds. The secret calendar address can itself lag several hours.')
+      .addSlider((sl) =>
+        sl
+          .setLimits(5, 240, 5)
+          .setValue(this.plugin.settings.calendarRefreshMinutes)
+          .setDynamicTooltip()
+          .onChange(async (v) => {
+            this.plugin.settings.calendarRefreshMinutes = v
+            await this.plugin.saveSettings()
+          })
+      )
+
+    new Setting(containerEl)
+      .setName('Meetings folder')
+      .setDesc('Where per-meeting notes are created.')
+      .addText((text) =>
+        text
+          .setPlaceholder('Meetings')
+          .setValue(this.plugin.settings.meetingsFolder)
+          .onChange(async (v) => {
+            this.plugin.settings.meetingsFolder = v.trim() || 'Meetings'
+            await this.plugin.saveSettings()
+          })
+      )
+
+    new Setting(containerEl)
+      .setName('Meeting note template')
+      .setDesc('Vault path to a note whose body is used for new meeting notes. Leave empty for the built-in template.')
+      .addText((text) =>
+        text
+          .setPlaceholder('Templates/Meeting.md')
+          .setValue(this.plugin.settings.meetingTemplatePath)
+          .onChange(async (v) => {
+            this.plugin.settings.meetingTemplatePath = v.trim()
+            await this.plugin.saveSettings()
+          })
+      )
+
     // ── Notifications ─────────────────────────────────────────────────────────
     new Setting(containerEl).setName('Due date notifications').setHeading()
 
@@ -226,6 +433,63 @@ export class PMSettingTab extends PluginSettingTab {
         this.plugin.settings.globalTeamMembers.splice(i, 1)
         void this.plugin.saveSettings()
         this.renderMembersList(container)
+      })
+    })
+  }
+
+  private renderCalendarList(container: HTMLElement): void {
+    container.empty()
+    const sources = this.plugin.settings.calendarSources
+
+    if (sources.length === 0) {
+      container.createEl('p', { cls: 'pm-settings-desc', text: 'No calendars subscribed yet.' })
+      return
+    }
+
+    sources.forEach((source, i) => {
+      const row = container.createDiv('pm-settings-calendar-row')
+
+      const enabled = row.createEl('input', { type: 'checkbox', cls: 'pm-settings-calendar-enabled' })
+      enabled.checked = source.enabled
+      enabled.ariaLabel = 'Enabled'
+      enabled.addEventListener('change', () => {
+        sources[i].enabled = enabled.checked
+        void this.plugin.saveSettings()
+      })
+
+      const color = row.createEl('input', { type: 'color', value: source.color })
+      color.ariaLabel = 'Calendar color'
+      color.addEventListener('change', () => {
+        sources[i].color = color.value
+        void this.plugin.saveSettings()
+      })
+
+      const name = row.createEl('input', { type: 'text', value: source.name, cls: 'pm-settings-calendar-name' })
+      name.placeholder = 'Work'
+      name.addEventListener('change', () => {
+        sources[i].name = name.value
+        void this.plugin.saveSettings()
+      })
+
+      // Masked: the secret iCal URL is a credential and should not sit on screen in plain text.
+      const url = row.createEl('input', { type: 'password', value: source.url, cls: 'pm-settings-calendar-url' })
+      url.placeholder = 'https://calendar.google.com/…/basic.ics'
+      url.addEventListener('change', () => {
+        sources[i].url = url.value.trim()
+        void this.plugin.saveSettings()
+      })
+
+      const reveal = row.createEl('button', { text: '👁', cls: 'pm-settings-calendar-reveal' })
+      reveal.ariaLabel = 'Show or hide the URL'
+      reveal.addEventListener('click', () => {
+        url.type = url.type === 'password' ? 'text' : 'password'
+      })
+
+      const del = row.createEl('button', { text: '✕', cls: 'pm-settings-del' })
+      del.addEventListener('click', () => {
+        sources.splice(i, 1)
+        void this.plugin.saveSettings()
+        this.renderCalendarList(container)
       })
     })
   }

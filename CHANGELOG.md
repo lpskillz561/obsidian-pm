@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- New home page view: a time-aware greeting, today's merged calendar agenda as a timeline, task widgets, and pinned/recent notes. Opens at startup by default
+- Calendar subscriptions via read-only secret iCal (.ics) URLs, with recurrence expansion (RRULE, EXDATE, RDATE and RECURRENCE-ID overrides), timezone resolution including Windows zone names, and an offline cache
+- Meeting notes: one note per calendar occurrence, created from a template and reopened on later clicks via a `pm_event_key` frontmatter field that survives renaming the note
+- New settings section "Home page" and "Calendars", including the meetings folder, meeting note template, greeting name, agenda length, and refresh interval
+- A project board can be embedded across the full width of the home page, driven by the existing kanban view so drag-to-change-status and the task context menu work there too
+- Display timezone setting for the agenda, defaulting to the system zone
+- Turn a note into a board card without moving it: "Add this note to a board" creates a card linking back to the note, and "Add this note's action items to a board" turns every unchecked `- [ ]` line into its own card. Both are on the command palette, the file explorer right-click menu, and the editor menu, and both are undoable. The note records what it has already exported, so re-running only adds what is new
+
+### Fixed
+
+- Agenda times showed the organiser's wall clock for meetings booked from another timezone (a Teams invite from London rendered 2:30 PM instead of 9:30 AM Eastern). Occurrences are now converted to the display timezone after recurrence is expanded in the event's own zone, so each series still holds its local time across its own region's DST switch
+
 ## [1.8.0] - 2026-07-03
 
 ### Added

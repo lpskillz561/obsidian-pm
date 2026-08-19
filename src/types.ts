@@ -1,3 +1,4 @@
+import type { CalendarSource } from './calendar/types'
 import { today } from './dates'
 import type { TaskIndex } from './store/TaskIndex'
 
@@ -130,6 +131,37 @@ export interface PMSettings {
   projectFilters: Record<string, PerProjectFilter>
   /** Collapsed task ids per project file path. UI state — lives here so toggles don't rewrite task files. */
   collapsedTasks: Record<string, string[]>
+
+  // ── Home page ──────────────────────────────────────────────────────────────
+  /**
+   * Subscribed iCal feeds. NOTE: these URLs are credentials — anyone holding one can read
+   * the calendar — and they live in data.json inside the vault, so they travel with any
+   * vault sync or backup. They are masked in settings and never written to the console.
+   */
+  calendarSources: CalendarSource[]
+  /** Vault folder for per-meeting notes. */
+  meetingsFolder: string
+  /** Optional template note used as the body of a new meeting note. Empty = built-in template. */
+  meetingTemplatePath: string
+  openHomeOnStartup: boolean
+  /** Name used in the home page greeting. Empty = greet without a name. */
+  homeGreetingName: string
+  /**
+   * IANA zone the agenda is rendered in. Empty = follow the machine. An explicit zone
+   * matters because a VEVENT keeps its organiser's TZID, so meetings booked from other
+   * regions would otherwise show that region's wall clock.
+   */
+  calendarTimeZone: string
+  calendarRefreshMinutes: number
+  /** How many days of agenda the home page shows, starting today. */
+  homeAgendaDays: number
+  /** Vault paths pinned to the home page. Ours, not Obsidian's bookmarks. */
+  pinnedNotes: string[]
+  homeShowTasks: boolean
+  homeShowNotes: boolean
+  homeShowKanban: boolean
+  /** Vault path of the project whose board is embedded on the home page. */
+  homeKanbanProject: string
 }
 
 // ─── Defaults ────────────────────────────────────────────────────────────────
@@ -166,7 +198,20 @@ export const DEFAULT_SETTINGS: PMSettings = {
   autoSchedule: true,
   saveTaskOnClose: true,
   projectFilters: {},
-  collapsedTasks: {}
+  collapsedTasks: {},
+  calendarSources: [],
+  meetingsFolder: 'Meetings',
+  meetingTemplatePath: '',
+  openHomeOnStartup: true,
+  homeGreetingName: '',
+  calendarTimeZone: '',
+  calendarRefreshMinutes: 30,
+  homeAgendaDays: 1,
+  pinnedNotes: [],
+  homeShowTasks: true,
+  homeShowNotes: true,
+  homeShowKanban: true,
+  homeKanbanProject: ''
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

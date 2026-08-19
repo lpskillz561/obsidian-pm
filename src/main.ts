@@ -1,10 +1,13 @@
-import { MarkdownView, Plugin, Notice } from 'obsidian'
+import { MarkdownView, Plugin, Notice, TFile } from 'obsidian'
 import { DEFAULT_SETTINGS, PMSettings, Project, Task } from './types'
 import { flattenTasks, findTask } from './store/TaskTreeOps'
 import { ProjectStore } from './store'
 import { PMSettingTab } from './settings'
 import { ProjectView, PM_PROJECT_VIEW_TYPE } from './views/ProjectView'
 import { DashboardView, PM_DASHBOARD_VIEW_TYPE } from './views/DashboardView'
+import { HomeView, PM_HOME_VIEW_TYPE } from './views/home/HomeView'
+import { addActionItemsToBoard, addNoteToBoard } from './notes/NoteToTask'
+import { CalendarStore } from './calendar/CalendarStore'
 import { PMViewRouter } from './views/PMViewRouter'
 import { openProjectModal, openTaskModal, openProjectPicker, openTaskPicker, openImportModal } from './ui/ModalFactory'
 import { Notifier } from './components/Notifier'
@@ -14,6 +17,7 @@ import { safeAsync } from './utils'
 export default class PMPlugin extends Plugin {
   settings: PMSettings = { ...DEFAULT_SETTINGS }
   store!: ProjectStore
+  calendars!: CalendarStore
   notifier!: Notifier
   router!: PMViewRouter
   undoStack: Array<{ undo: () => Promise<void>; redo: () => Promise<void> }> = []
@@ -45,21 +49,36 @@ export default class PMPlugin extends Plugin {
     await this.loadSettings()
     this.store = new ProjectStore(this.app, () => this.settings.statuses)
     this.store.registerCacheInvalidation(this)
+    this.calendars = new CalendarStore(this)
     this.notifier = new Notifier(this)
     this.router = new PMViewRouter(this)
 
     this.registerView(PM_PROJECT_VIEW_TYPE, (leaf) => new ProjectView(leaf, this))
     this.registerView(PM_DASHBOARD_VIEW_TYPE, (leaf) => new DashboardView(leaf, this))
+    this.registerView(PM_HOME_VIEW_TYPE, (leaf) => new HomeView(leaf, this))
 
     this.app.workspace.onLayoutReady(
       safeAsync(async () => {
         await migrateProjects(this)
         await this.cleanupStaleProjectFilters()
+        if (this.settings.openHomeOnStartup) await this.router.openHome(true)
       })
     )
 
+    this.addRibbonIcon('home', 'Home', async () => {
+      await this.router.openHome()
+    })
+
     this.addRibbonIcon('chart-gantt', 'Project manager', async () => {
       await this.router.openDashboard()
+    })
+
+    this.addCommand({
+      id: 'open-home',
+      name: 'Open home page',
+      callback: () => {
+        void this.router.openHome()
+      }
     })
 
     this.addCommand({
@@ -135,14 +154,73 @@ export default class PMPlugin extends Plugin {
     })
 
     this.registerEvent(
-      this.app.workspace.on('editor-menu', (menu, editor) => {
+      this.app.workspace.on('editor-menu', (menu, editor, info) => {
         const selection = editor.getSelection().trim()
-        if (!selection) return
+        if (selection) {
+          menu.addItem((item) =>
+            item
+              .setTitle('Create task from selection')
+              .setIcon('list-plus')
+              .onClick(() => void this.createTaskFromText(selection))
+          )
+        }
+        const file = info.file
+        if (!file || this.isPluginFile(file)) return
         menu.addItem((item) =>
           item
-            .setTitle('Create task from selection')
-            .setIcon('list-plus')
-            .onClick(() => void this.createTaskFromText(selection))
+            .setTitle('Add note to board')
+            .setIcon('square-kanban')
+            .onClick(() => addNoteToBoard(this, file))
+        )
+        menu.addItem((item) =>
+          item
+            .setTitle('Add action items to board')
+            .setIcon('list-checks')
+            .onClick(() => addActionItemsToBoard(this, file))
+        )
+      })
+    )
+
+    this.addCommand({
+      id: 'add-note-to-board',
+      name: 'Add this note to a board',
+      checkCallback: (checking: boolean) => {
+        const file = this.activeNote()
+        if (!file) return false
+        if (checking) return true
+        addNoteToBoard(this, file)
+        return true
+      }
+    })
+
+    this.addCommand({
+      id: 'add-note-action-items-to-board',
+      name: 'Add this note’s action items to a board',
+      checkCallback: (checking: boolean) => {
+        const file = this.activeNote()
+        if (!file) return false
+        if (checking) return true
+        addActionItemsToBoard(this, file)
+        return true
+      }
+    })
+
+    // Right-click a note in the file explorer, or the note's own ⋯ menu.
+    this.registerEvent(
+      this.app.workspace.on('file-menu', (menu, file) => {
+        if (!(file instanceof TFile) || file.extension !== 'md') return
+        if (this.isPluginFile(file)) return
+        menu.addItem((item) =>
+          item
+            .setTitle('Add to board')
+            .setIcon('square-kanban')
+            .onClick(() => addNoteToBoard(this, file))
+        )
+        menu.addItem((item) =>
+          item
+            .setTitle('Add action items to board')
+            .setIcon('list-checks')
+            .onClick(() => addActionItemsToBoard(this, file))
         )
       })
     )
@@ -272,6 +350,29 @@ export default class PMPlugin extends Plugin {
   refreshProjectViews(): void {
     for (const leaf of this.app.workspace.getLeavesOfType(PM_PROJECT_VIEW_TYPE)) {
       if (leaf.view instanceof ProjectView) void leaf.view.refreshProject()
+    }
+  }
+
+  /**
+   * Files the plugin owns — project notes and task notes both live under the projects
+   * folder. Offering "add to board" on a task note would make a card out of a card.
+   */
+  private isPluginFile(file: TFile): boolean {
+    const folder = this.settings.projectsFolder.replace(/\/+$/, '')
+    return Boolean(folder) && (file.path === folder || file.path.startsWith(`${folder}/`))
+  }
+
+  /** The focused markdown note, or null when there isn't one worth acting on. */
+  private activeNote(): TFile | null {
+    const file = this.app.workspace.getActiveViewOfType(MarkdownView)?.file
+    if (!file || file.extension !== 'md' || this.isPluginFile(file)) return null
+    return file
+  }
+
+  /** Re-render every open home page, e.g. after a card is added to the embedded board. */
+  refreshHomeViews(): void {
+    for (const leaf of this.app.workspace.getLeavesOfType(PM_HOME_VIEW_TYPE)) {
+      if (leaf.view instanceof HomeView) leaf.view.render()
     }
   }
 

@@ -63,7 +63,6 @@ interface Handoff {
 interface ResultEnvelope {
   is_error?: boolean
   result?: string
-  total_cost_usd?: number
 }
 
 /** How long an error badge lingers on the card before clearing itself. */
@@ -154,10 +153,11 @@ export class ClaudeRunner {
     }
 
     const { fs, os, path } = node()
-    const runId = `pm-${task.id}-${Date.now().toString(36)}`
+    const startedAt = Date.now()
+    const runId = `pm-${task.id}-${startedAt.toString(36)}`
     const unsubscribe = opts.onUpdate ? this.onChange(opts.onUpdate) : null
 
-    this.runs.set(task.id, { phase: 'running', startedAt: Date.now() })
+    this.runs.set(task.id, { phase: 'running', startedAt })
     this.emit()
 
     // Description lives in the note body and may not be loaded yet — the agent
@@ -186,7 +186,7 @@ export class ClaudeRunner {
     try {
       await fs.writeFile(handoffPath, JSON.stringify(handoff, null, 2), 'utf8')
       const envelope = await this.spawnClaude(task.id, handoffPath, dir, repo)
-      await this.absorbResult(task, envelope)
+      await this.absorbResult(task, envelope, startedAt)
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e)
       console.error(`[PM] Claude run failed for "${task.title}":`, e)
@@ -279,16 +279,20 @@ export class ClaudeRunner {
    * now stale. Re-read it before anything triggers a body rewrite, or the save
    * path would serialize the pre-run body back over the new comment.
    */
-  private async absorbResult(task: Task, envelope: ResultEnvelope): Promise<void> {
+  private async absorbResult(task: Task, envelope: ResultEnvelope, startedAt: number): Promise<void> {
     await this.plugin.store.reloadTaskBody(task)
     this.finish(task.id, envelope.is_error ? (envelope.result ?? 'the run reported an error') : undefined)
     if (envelope.is_error) {
       new Notice(`Claude hit an error on "${task.title}".`)
-    } else {
-      const cost = envelope.total_cost_usd
-      const suffix = typeof cost === 'number' ? ` ($${cost.toFixed(2)})` : ''
-      new Notice(`Claude commented on "${task.title}"${suffix}.`)
+      return
     }
+    // Deliberately not reporting `total_cost_usd`. The CLI reports it whatever
+    // the auth mode, but this runs on subscription OAuth, so it is an
+    // API-equivalent figure and not a charge — printing it as dollars reads
+    // like a bill. Elapsed time is the honest number here.
+    const seconds = Math.round((Date.now() - startedAt) / 1000)
+    const elapsed = seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`
+    new Notice(`Claude commented on "${task.title}" (${elapsed}).`)
   }
 
   private finish(taskId: string, errorMessage?: string): void {

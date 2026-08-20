@@ -142,6 +142,18 @@ export class PMSettingTab extends PluginSettingTab {
         })
       )
 
+    new Setting(containerEl)
+      .setName('Copy button on inline code')
+      .setDesc('Show a copy button beside anything written between backticks in your notes, such as API keys.')
+      .addToggle((t) =>
+        t.setValue(this.plugin.settings.inlineCodeCopyButton).onChange(async (v) => {
+          this.plugin.settings.inlineCodeCopyButton = v
+          await this.plugin.saveSettings()
+          if (!v) this.plugin.inlineCodeCopy.removeAll()
+          this.plugin.refreshMarkdownViews()
+        })
+      )
+
     // ── Home page ─────────────────────────────────────────────────────────────
     new Setting(containerEl).setName('Home page').setHeading()
 

@@ -7,6 +7,7 @@ import { ProjectView, PM_PROJECT_VIEW_TYPE } from './views/ProjectView'
 import { DashboardView, PM_DASHBOARD_VIEW_TYPE } from './views/DashboardView'
 import { HomeView, PM_HOME_VIEW_TYPE } from './views/home/HomeView'
 import { addActionItemsToBoard, addNoteToBoard } from './notes/NoteToTask'
+import { InlineCodeCopy } from './notes/InlineCodeCopy'
 import { CalendarStore } from './calendar/CalendarStore'
 import { PMViewRouter } from './views/PMViewRouter'
 import { openProjectModal, openTaskModal, openProjectPicker, openTaskPicker, openImportModal } from './ui/ModalFactory'
@@ -20,6 +21,7 @@ export default class PMPlugin extends Plugin {
   calendars!: CalendarStore
   notifier!: Notifier
   router!: PMViewRouter
+  inlineCodeCopy!: InlineCodeCopy
   undoStack: Array<{ undo: () => Promise<void>; redo: () => Promise<void> }> = []
   redoStack: Array<{ undo: () => Promise<void>; redo: () => Promise<void> }> = []
 
@@ -52,6 +54,8 @@ export default class PMPlugin extends Plugin {
     this.calendars = new CalendarStore(this)
     this.notifier = new Notifier(this)
     this.router = new PMViewRouter(this)
+    this.inlineCodeCopy = new InlineCodeCopy(this)
+    this.inlineCodeCopy.register()
 
     this.registerView(PM_PROJECT_VIEW_TYPE, (leaf) => new ProjectView(leaf, this))
     this.registerView(PM_DASHBOARD_VIEW_TYPE, (leaf) => new DashboardView(leaf, this))
@@ -350,6 +354,13 @@ export default class PMPlugin extends Plugin {
   refreshProjectViews(): void {
     for (const leaf of this.app.workspace.getLeavesOfType(PM_PROJECT_VIEW_TYPE)) {
       if (leaf.view instanceof ProjectView) void leaf.view.refreshProject()
+    }
+  }
+
+  /** Re-run markdown post-processors in open reading views, e.g. after a settings change. */
+  refreshMarkdownViews(): void {
+    for (const leaf of this.app.workspace.getLeavesOfType('markdown')) {
+      if (leaf.view instanceof MarkdownView) leaf.view.previewMode?.rerender(true)
     }
   }
 

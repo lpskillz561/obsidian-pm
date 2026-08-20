@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New settings section "Home page" and "Calendars", including the meetings folder, meeting note template, greeting name, agenda length, and refresh interval
 - A project board can be embedded across the full width of the home page, driven by the existing kanban view so drag-to-change-status and the task context menu work there too
 - Display timezone setting for the agenda, defaulting to the system zone
+- A copy button beside inline code (anything between backticks) in notes, for lifting out API keys, tokens and ids in one click. Reading view gets a button after each value; in Live Preview a button floats beside whichever value the pointer is over. Fenced code blocks are untouched — Obsidian already covers those. Toggle: "Copy button on inline code"
 - Turn a note into a board card without moving it: "Add this note to a board" creates a card linking back to the note, and "Add this note's action items to a board" turns every unchecked `- [ ]` line into its own card. Both are on the command palette, the file explorer right-click menu, and the editor menu, and both are undoable. The note records what it has already exported, so re-running only adds what is new
 
 ### Fixed

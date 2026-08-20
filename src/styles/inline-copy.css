@@ -1,0 +1,71 @@
+/* Copy button beside inline code (`like this`) in notes.
+   These render inside Obsidian's markdown views, outside .pm-root, so they use
+   Obsidian's own variables rather than the --pm-* tokens. */
+
+.pm-copy-code {
+  appearance: none;
+  box-shadow: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4em;
+  height: 1.4em;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  vertical-align: baseline;
+  opacity: 0.55;
+  transition:
+    opacity 0.12s ease,
+    color 0.12s ease,
+    background-color 0.12s ease;
+}
+
+.pm-copy-code .svg-icon {
+  width: 0.9em;
+  height: 0.9em;
+}
+
+.pm-copy-code:hover {
+  opacity: 1;
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.pm-copy-code:focus-visible {
+  opacity: 1;
+  box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
+  outline: none;
+}
+
+.pm-copy-code.is-copied,
+.pm-copy-code.is-copied:hover {
+  opacity: 1;
+  color: var(--color-green);
+  background: transparent;
+}
+
+/* -- Reading view: sits in the flow, right after the <code> ----------------- */
+.pm-copy-code--inline {
+  margin-inline-start: 0.15em;
+}
+
+/* Keep the button from wrapping onto its own line, away from the code it copies. */
+code:has(+ .pm-copy-code--inline) {
+  white-space: nowrap;
+}
+
+/* -- Live Preview: floats over the editor, anchored to the hovered token ---- */
+.pm-copy-code--floating {
+  position: fixed;
+  z-index: var(--layer-popover);
+  transform: translateY(-50%);
+  opacity: 1;
+  color: var(--text-muted);
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  box-shadow: var(--shadow-s);
+}

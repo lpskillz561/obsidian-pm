@@ -128,6 +128,8 @@ export interface PMSettings {
   kanbanShowDescriptionPreview: boolean
   showTagColors: boolean
   saveTaskOnClose: boolean
+  /** Show a copy button beside inline code (`like this`) in notes. */
+  inlineCodeCopyButton: boolean
   projectFilters: Record<string, PerProjectFilter>
   /** Collapsed task ids per project file path. UI state — lives here so toggles don't rewrite task files. */
   collapsedTasks: Record<string, string[]>
@@ -197,6 +199,7 @@ export const DEFAULT_SETTINGS: PMSettings = {
   notificationLeadDays: 2,
   autoSchedule: true,
   saveTaskOnClose: true,
+  inlineCodeCopyButton: true,
   projectFilters: {},
   collapsedTasks: {},
   calendarSources: [],

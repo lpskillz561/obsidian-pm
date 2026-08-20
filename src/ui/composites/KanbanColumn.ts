@@ -18,6 +18,7 @@ export interface KanbanCardData {
   loggedHours: number
   overdue: boolean
   showTagColors: boolean
+  agentState?: { phase: 'running' | 'error'; message?: string }
 }
 
 export interface KanbanColumnProps {

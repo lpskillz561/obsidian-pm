@@ -25,6 +25,8 @@ export class TaskModal extends Modal {
   private task: Task
   private isNew: boolean
   private originalParentId: string | null
+  /** Snapshot at open time, so we can tell an assignment from a re-save. */
+  private originalAssignees: string[]
   private cancelled = false
   private saved = false
   private persistPromise: Promise<void> | null = null
@@ -61,6 +63,7 @@ export class TaskModal extends Modal {
       this.isNew = true
     }
     this.originalParentId = this.parentId
+    this.originalAssignees = [...(task?.assignees ?? [])]
   }
 
   onOpen(): void {
@@ -149,6 +152,22 @@ export class TaskModal extends Modal {
       await this.plugin.store.scheduleAfterChange(this.project, this.task.id, this.plugin.settings.statuses)
     }
     await this.onSave(this.task)
+    this.maybeHandOffToClaude()
+  }
+
+  /**
+   * Assigning the agent is the trigger. Fires only on the transition — an edit
+   * to a task the agent is already assigned to must not start a second run, or
+   * every status change would re-investigate (and re-bill) the same card.
+   *
+   * Deliberately not awaited: a run takes minutes and the modal is closing.
+   */
+  private maybeHandOffToClaude(): void {
+    const { assignee, autoRunOnAssign, enabled } = this.plugin.settings.claude
+    if (!enabled || !autoRunOnAssign) return
+    if (!this.task.assignees.includes(assignee)) return
+    if (this.originalAssignees.includes(assignee)) return
+    void this.plugin.claude.run(this.project, this.task, { onUpdate: () => void this.onSave(this.task) })
   }
 
   private openOverflowMenu(anchorEl: HTMLElement): void {

@@ -22,6 +22,19 @@ export interface TimeLog {
   note: string
 }
 
+/**
+ * A comment on a task. Lives in a managed `## Comments` section at the end of
+ * the task note's body — markdown, because these are read in Obsidian as often
+ * as they are read by the plugin, and a wall of escaped YAML is neither.
+ */
+export interface TaskComment {
+  author: string
+  at: string // ISO 8601 with offset
+  body: string // markdown
+  /** Set when an agent wrote the comment; ties it back to a ClaudeRunner run. */
+  runId?: string
+}
+
 export interface CustomFieldDef {
   id: string
   name: string
@@ -48,6 +61,8 @@ export interface Task {
   recurrence?: Recurrence
   timeEstimate?: number // hours
   timeLogs?: TimeLog[]
+  /** Parsed from the note body's managed `## Comments` section. */
+  comments?: TaskComment[]
   customFields: Record<string, unknown>
   /** UI state, persisted per project in plugin settings (data.json), not in frontmatter. */
   collapsed: boolean
@@ -113,6 +128,31 @@ export interface PriorityConfig {
   icon: string
 }
 
+/**
+ * Handing board tasks to a local Claude Code agent.
+ *
+ * `claude-zixi` on this machine is a shell function, not a binary
+ * (`CLAUDE_CONFIG_DIR=$HOME/.claude-zixi command claude`), and Obsidian's
+ * Electron process has a bare PATH that would not find it either way — so we
+ * spawn the real binary by absolute path and set the config dir ourselves.
+ */
+export interface ClaudeSettings {
+  enabled: boolean
+  /** Absolute path to the `claude` binary. A bare command name will not resolve. */
+  binaryPath: string
+  /** CLAUDE_CONFIG_DIR for the spawned process — picks the persona and its skills. */
+  configDir: string
+  /** Assignee name that stands for the agent. Assigning it can trigger a run. */
+  assignee: string
+  /** Model alias, e.g. 'sonnet'. Empty = whatever the config dir's settings say. */
+  model: string
+  timeoutMinutes: number
+  /** Run automatically when the agent is added as an assignee, not just on demand. */
+  autoRunOnAssign: boolean
+  /** Project file path → absolute path of the code repo it maps to. */
+  repoPaths: Record<string, string>
+}
+
 export interface PMSettings {
   projectsFolder: string
   defaultView: ViewMode
@@ -164,6 +204,20 @@ export interface PMSettings {
   homeShowKanban: boolean
   /** Vault path of the project whose board is embedded on the home page. */
   homeKanbanProject: string
+
+  // ── Agent ──────────────────────────────────────────────────────────────────
+  claude: ClaudeSettings
+}
+
+export const DEFAULT_CLAUDE_SETTINGS: ClaudeSettings = {
+  enabled: false,
+  binaryPath: '',
+  configDir: '',
+  assignee: 'claude-zixi',
+  model: '',
+  timeoutMinutes: 15,
+  autoRunOnAssign: true,
+  repoPaths: {}
 }
 
 // ─── Defaults ────────────────────────────────────────────────────────────────
@@ -214,7 +268,8 @@ export const DEFAULT_SETTINGS: PMSettings = {
   homeShowTasks: true,
   homeShowNotes: true,
   homeShowKanban: true,
-  homeKanbanProject: ''
+  homeKanbanProject: '',
+  claude: DEFAULT_CLAUDE_SETTINGS
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

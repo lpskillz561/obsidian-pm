@@ -11,6 +11,7 @@ import type { SubView } from './SubView'
 
 export class KanbanView implements SubView {
   private dragTask: Task | null = null
+  private unsubscribeAgent: (() => void) | null = null
 
   constructor(
     private container: HTMLElement,
@@ -25,6 +26,15 @@ export class KanbanView implements SubView {
     if (this.plugin.settings.kanbanShowDescriptionPreview) {
       void this.hydrateDescriptions()
     }
+    // A run outlives any single interaction, so the board listens for its state
+    // rather than being told. Re-subscribing is safe: render() may run again.
+    this.unsubscribeAgent?.()
+    this.unsubscribeAgent = this.plugin.claude.onChange(() => this.renderBoard())
+  }
+
+  destroy(): void {
+    this.unsubscribeAgent?.()
+    this.unsubscribeAgent = null
   }
 
   private renderBoard(): void {
@@ -113,7 +123,8 @@ export class KanbanView implements SubView {
       subtaskProgress,
       loggedHours: totalLoggedHours(task),
       overdue: isTaskOverdue(task, this.plugin.settings.statuses),
-      showTagColors: this.plugin.settings.showTagColors
+      showTagColors: this.plugin.settings.showTagColors,
+      agentState: this.plugin.claude.stateFor(task.id)
     }
   }
 

@@ -1,5 +1,5 @@
 import { MarkdownView, Plugin, Notice, TFile } from 'obsidian'
-import { DEFAULT_SETTINGS, PMSettings, Project, Task } from './types'
+import { DEFAULT_CLAUDE_SETTINGS, DEFAULT_SETTINGS, PMSettings, Project, Task } from './types'
 import { flattenTasks, findTask } from './store/TaskTreeOps'
 import { ProjectStore } from './store'
 import { PMSettingTab } from './settings'
@@ -12,6 +12,7 @@ import { CalendarStore } from './calendar/CalendarStore'
 import { PMViewRouter } from './views/PMViewRouter'
 import { openProjectModal, openTaskModal, openProjectPicker, openTaskPicker, openImportModal } from './ui/ModalFactory'
 import { Notifier } from './components/Notifier'
+import { ClaudeRunner } from './services/ClaudeRunner'
 import { migrateProjects } from './migration'
 import { safeAsync } from './utils'
 
@@ -22,6 +23,7 @@ export default class PMPlugin extends Plugin {
   notifier!: Notifier
   router!: PMViewRouter
   inlineCodeCopy!: InlineCodeCopy
+  claude!: ClaudeRunner
   undoStack: Array<{ undo: () => Promise<void>; redo: () => Promise<void> }> = []
   redoStack: Array<{ undo: () => Promise<void>; redo: () => Promise<void> }> = []
 
@@ -56,6 +58,7 @@ export default class PMPlugin extends Plugin {
     this.router = new PMViewRouter(this)
     this.inlineCodeCopy = new InlineCodeCopy(this)
     this.inlineCodeCopy.register()
+    this.claude = new ClaudeRunner(this)
 
     this.registerView(PM_PROJECT_VIEW_TYPE, (leaf) => new ProjectView(leaf, this))
     this.registerView(PM_DASHBOARD_VIEW_TYPE, (leaf) => new DashboardView(leaf, this))
@@ -250,6 +253,7 @@ export default class PMPlugin extends Plugin {
 
   onunload(): void {
     this.notifier.stop()
+    this.claude.shutdown()
   }
 
   async loadSettings(): Promise<void> {
@@ -259,6 +263,10 @@ export default class PMPlugin extends Plugin {
     if (!saved?.priorities?.length) this.settings.priorities = DEFAULT_SETTINGS.priorities
     if (!this.settings.projectFilters) this.settings.projectFilters = {}
     if (!this.settings.collapsedTasks) this.settings.collapsedTasks = {}
+    // Object.assign is shallow, so a partially-saved `claude` block would drop
+    // every key it happens not to contain. Merge it a level deeper.
+    this.settings.claude = { ...DEFAULT_CLAUDE_SETTINGS, ...saved?.claude }
+    if (!this.settings.claude.repoPaths) this.settings.claude.repoPaths = {}
 
     let migrated = false
     for (const s of this.settings.statuses) {

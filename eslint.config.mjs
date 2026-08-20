@@ -16,5 +16,21 @@ export default defineConfig([
     rules: {
       'obsidianmd/no-static-styles-assignment': 'off'
     }
+  },
+  {
+    // Spawning a local Claude agent needs Node's APIs, which the submission
+    // ruleset bans outright because they break mobile. This file loads them
+    // lazily inside `Platform.isDesktopApp` guards, so the plugin still loads
+    // on mobile — the feature is just absent there.
+    //
+    // If this fork is ever submitted to the community store, expect a reviewer
+    // to ask about exactly this file.
+    files: ['src/services/ClaudeRunner.ts'],
+    languageOptions: {
+      globals: { require: 'readonly', process: 'readonly', Buffer: 'readonly' }
+    },
+    rules: {
+      'import/no-nodejs-modules': 'off'
+    }
   }
 ])

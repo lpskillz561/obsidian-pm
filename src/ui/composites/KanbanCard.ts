@@ -14,6 +14,8 @@ export interface KanbanCardProps {
   loggedHours: number
   overdue: boolean
   showTagColors: boolean
+  /** Live state of a Claude run on this task, if any. */
+  agentState?: { phase: 'running' | 'error'; message?: string }
   onClick: () => void
   onContextMenu: (e: MouseEvent) => void
   onDragStart: () => void
@@ -74,6 +76,17 @@ export class KanbanCard {
         .setSize('sm')
         .setColor('var(--color-blue)')
         .setTooltip('Recurring')
+    }
+
+    if (props.agentState) {
+      const running = props.agentState.phase === 'running'
+      const chip = new Chip(titleRow)
+        .setLabel(running ? 'Claude…' : 'Claude failed')
+        .setVariant('solid')
+        .setSize('sm')
+        .setColor(running ? 'var(--color-blue)' : 'var(--color-red)')
+        .setTooltip(props.agentState.message ?? 'Claude is investigating this task')
+      if (running) chip.el.addClass('pm-agent-chip--running')
     }
 
     if (props.descriptionPreview) {

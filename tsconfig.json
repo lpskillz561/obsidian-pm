@@ -6,6 +6,9 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "lib": ["ES2022", "DOM"],
+    // TypeScript 6 dropped implicit @types inclusion. ClaudeRunner needs Node's
+    // child_process/fs/os/path types (lazily required at runtime, desktop only).
+    "types": ["node"],
     "inlineSourceMap": true,
     "inlineSources": true,
     "isolatedModules": true,

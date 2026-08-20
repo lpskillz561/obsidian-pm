@@ -1,4 +1,4 @@
-import { Menu, Notice } from 'obsidian'
+import { Menu, Notice, Platform } from 'obsidian'
 import type PMPlugin from '../main'
 import type { Task, Project } from '../types'
 import { safeAsync } from '../utils'
@@ -8,6 +8,38 @@ export interface TaskMenuContext {
   plugin: PMPlugin
   project: Project
   onRefresh: () => Promise<void>
+}
+
+/**
+ * Hand-off actions for the local Claude agent. Hidden entirely when the feature
+ * is off, but shown-and-explaining when it is on yet misconfigured — a menu item
+ * that silently does nothing is worse than one that says why.
+ */
+function addClaudeItems(menu: Menu, task: Task, ctx: TaskMenuContext): void {
+  const { claude } = ctx.plugin
+  if (!ctx.plugin.settings.claude.enabled || !Platform.isDesktopApp) return
+
+  menu.addSeparator()
+  if (claude.isRunning(task.id)) {
+    menu.addItem((item) =>
+      item
+        .setTitle('Stop Claude')
+        .setIcon('square')
+        .onClick(() => claude.cancel(task.id))
+    )
+    return
+  }
+
+  const blocked = claude.unavailableReason() ?? (claude.repoFor(ctx.project) ? null : 'No repo mapped to this project.')
+  menu.addItem((item) =>
+    item
+      .setTitle(blocked ? `Ask Claude — ${blocked}` : 'Ask Claude')
+      .setIcon('bot')
+      .setDisabled(Boolean(blocked))
+      .onClick(() => {
+        void claude.run(ctx.project, task, { onUpdate: () => void ctx.onRefresh() })
+      })
+  )
 }
 
 /**
@@ -57,6 +89,7 @@ export function buildTaskContextMenu(menu: Menu, task: Task, ctx: TaskMenuContex
         })
       )
   )
+  addClaudeItems(menu, task, ctx)
   menu.addSeparator()
   if (task.archived) {
     menu.addItem((item) =>

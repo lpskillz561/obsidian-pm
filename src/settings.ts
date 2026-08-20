@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting, Notice } from 'obsidian'
+import { App, Platform, PluginSettingTab, Setting, Notice } from 'obsidian'
 import type PMPlugin from './main'
 import { PMSettings, DEFAULT_SETTINGS, makeId } from './types'
 import { DEFAULT_CALENDAR_COLORS, makeSourceId } from './calendar/types'
@@ -426,6 +426,160 @@ export class PMSettingTab extends PluginSettingTab {
           this.renderStatusList(statusContainer)
         })
     )
+
+    this.renderClaudeSection(containerEl)
+  }
+
+  // ── Agent ────────────────────────────────────────────────────────────────
+  private renderClaudeSection(containerEl: HTMLElement): void {
+    const claude = this.plugin.settings.claude
+
+    new Setting(containerEl).setName('Claude agent').setHeading()
+    containerEl.createEl('p', {
+      cls: 'pm-settings-desc',
+      text:
+        'Hand a task to a local Claude Code agent: it reads the card, investigates the mapped ' +
+        'repo read-only, and posts its findings back as a comment. Desktop only.'
+    })
+
+    if (!Platform.isDesktopApp) {
+      containerEl.createEl('p', {
+        cls: 'pm-settings-desc',
+        text: 'Unavailable on mobile — running a local agent needs a desktop app.'
+      })
+      return
+    }
+
+    new Setting(containerEl)
+      .setName('Enable')
+      .setDesc('Adds the hand-off action to the task menu.')
+      .addToggle((t) =>
+        t.setValue(claude.enabled).onChange(async (v) => {
+          claude.enabled = v
+          await this.plugin.saveSettings()
+          this.display()
+        })
+      )
+
+    if (!claude.enabled) return
+
+    new Setting(containerEl)
+      .setName('Claude binary')
+      .setDesc(
+        'Absolute path — a bare command name will not resolve, because Obsidian runs with a minimal PATH. ' +
+          'Find yours with `which claude` in a terminal.'
+      )
+      .addText((text) =>
+        text
+          .setPlaceholder('Absolute path to the binary')
+          .setValue(claude.binaryPath)
+          .onChange(async (v) => {
+            claude.binaryPath = v.trim()
+            await this.plugin.saveSettings()
+          })
+      )
+
+    new Setting(containerEl)
+      .setName('Config directory')
+      .setDesc(
+        'CLAUDE_CONFIG_DIR for the spawned agent — this picks which persona runs, and which skills it has. ' +
+          'The obsidian-pm-task skill must live under <dir>/skills/.'
+      )
+      .addText((text) =>
+        text
+          .setPlaceholder('Absolute path to the config directory')
+          .setValue(claude.configDir)
+          .onChange(async (v) => {
+            claude.configDir = v.trim().replace(/\/$/, '')
+            await this.plugin.saveSettings()
+          })
+      )
+
+    new Setting(containerEl)
+      .setName('Assignee name')
+      .setDesc('Assigning this name to a task stands for "give it to the agent".')
+      .addText((text) =>
+        text
+          .setPlaceholder('Agent name')
+          .setValue(claude.assignee)
+          .onChange(async (v) => {
+            claude.assignee = v.trim() || 'claude-zixi'
+            await this.plugin.saveSettings()
+          })
+      )
+
+    new Setting(containerEl)
+      .setName('Run on assignment')
+      .setDesc('Start a run as soon as the agent is added as an assignee. Off = only from the task menu.')
+      .addToggle((t) =>
+        t.setValue(claude.autoRunOnAssign).onChange(async (v) => {
+          claude.autoRunOnAssign = v
+          await this.plugin.saveSettings()
+        })
+      )
+
+    new Setting(containerEl)
+      .setName('Model')
+      .setDesc('Leave empty to use whatever the config directory is set to.')
+      .addDropdown((dd) =>
+        dd
+          .addOption('', 'Config default')
+          .addOption('haiku', 'Haiku')
+          .addOption('sonnet', 'Sonnet')
+          .addOption('opus', 'Opus')
+          .setValue(claude.model)
+          .onChange(async (v) => {
+            claude.model = v
+            await this.plugin.saveSettings()
+          })
+      )
+
+    new Setting(containerEl)
+      .setName('Timeout')
+      .setDesc('Minutes before a run is killed. A real investigation often takes 3-5.')
+      .addText((text) =>
+        text.setValue(String(claude.timeoutMinutes)).onChange(async (v) => {
+          const n = parseInt(v, 10)
+          if (!isNaN(n) && n > 0) {
+            claude.timeoutMinutes = n
+            await this.plugin.saveSettings()
+          }
+        })
+      )
+
+    new Setting(containerEl).setName('Project repositories').setHeading()
+    containerEl.createEl('p', {
+      cls: 'pm-settings-desc',
+      text: 'The agent runs with its working directory set to the repo mapped here. Projects with no repo cannot be handed off.'
+    })
+    const repoContainer = containerEl.createDiv('pm-settings-repos')
+    void this.renderRepoList(repoContainer)
+  }
+
+  private async renderRepoList(container: HTMLElement): Promise<void> {
+    container.empty()
+    const projects = await this.plugin.store.loadAllProjects(this.plugin.settings.projectsFolder)
+    if (!projects.length) {
+      container.createEl('p', { cls: 'pm-settings-desc', text: 'No projects yet.' })
+      return
+    }
+    const repoPaths = this.plugin.settings.claude.repoPaths
+    for (const project of projects) {
+      new Setting(container)
+        .setName(project.title)
+        .setDesc(project.filePath)
+        .addText((text) =>
+          text
+            .setPlaceholder('/absolute/path/to/repo')
+            .setValue(repoPaths[project.filePath] ?? '')
+            .onChange(async (v) => {
+              const trimmed = v.trim().replace(/\/$/, '')
+              if (trimmed) repoPaths[project.filePath] = trimmed
+              else Reflect.deleteProperty(repoPaths, project.filePath)
+              await this.plugin.saveSettings()
+            })
+        )
+    }
   }
 
   private renderMembersList(container: HTMLElement): void {

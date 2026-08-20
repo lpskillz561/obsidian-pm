@@ -161,3 +161,25 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Agent run badge. The pulse is the only signal that a run is still alive —
+   the process is out of band, so there is nothing else to watch. */
+.pm-agent-chip--running {
+  animation: pm-agent-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pm-agent-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pm-agent-chip--running {
+    animation: none;
+  }
+}

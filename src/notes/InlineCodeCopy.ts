@@ -109,6 +109,11 @@ export class InlineCodeCopy {
 
   private decorateRendered(el: HTMLElement): void {
     if (!this.plugin.settings.inlineCodeCopyButton) return
+    // The post-processor fires for every MarkdownRenderer.render call, including
+    // the ones the plugin makes in its own modals. An agent comment is dense
+    // with `file.ts:211` and `--flag` spans, and a copy button after each one
+    // turns it into confetti. This feature is for notes, not our own chrome.
+    if (el.closest('.pm-modal')) return
 
     for (const code of Array.from(el.querySelectorAll('code'))) {
       if (code.closest('pre')) continue // fenced block — Obsidian already covers these

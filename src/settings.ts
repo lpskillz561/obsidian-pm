@@ -519,6 +519,24 @@ export class PMSettingTab extends PluginSettingTab {
       )
 
     new Setting(containerEl)
+      .setName('Tool access')
+      .setDesc(
+        'Full gives the agent everything its config directory provides — all tools, skills and MCP servers — ' +
+          'the same as running that persona yourself in a terminal, and it can edit files and run commands. ' +
+          'Read-only restricts it to reads, searches and read-only git, which also cuts off MCP servers.'
+      )
+      .addDropdown((dd) =>
+        dd
+          .addOption('full', 'Full — same as your terminal')
+          .addOption('readonly', 'Read-only')
+          .setValue(claude.toolAccess)
+          .onChange(async (v) => {
+            claude.toolAccess = v as typeof claude.toolAccess
+            await this.plugin.saveSettings()
+          })
+      )
+
+    new Setting(containerEl)
       .setName('Model')
       .setDesc(
         'Config default follows the config directory, which is the safest choice — it already carries the ' +

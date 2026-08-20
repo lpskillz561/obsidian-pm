@@ -205,31 +205,37 @@ export class ClaudeRunner {
     const cfg = this.plugin.settings.claude
     const script = path.join(cfg.configDir, 'skills', 'obsidian-pm-task', 'scripts', 'pm_comment.py')
 
-    // Read-only, plus exactly one command that can write — the comment script.
-    // In print mode anything outside the allowlist is denied rather than
-    // prompting, so this is a hard boundary, not a suggestion.
-    const allowed = [
-      'Read',
-      'Grep',
-      'Glob',
-      'Bash(git log:*)',
-      'Bash(git diff:*)',
-      'Bash(git show:*)',
-      'Bash(git status:*)',
-      'Bash(git blame:*)',
-      `Bash(python3 ${script}:*)`
-    ].join(' ')
+    const args = ['-p', `/obsidian-pm-task ${handoffPath}`, '--output-format', 'json', '--add-dir', handoffDir]
 
-    const args = [
-      '-p',
-      `/obsidian-pm-task ${handoffPath}`,
-      '--output-format',
-      'json',
-      '--add-dir',
-      handoffDir,
-      '--allowedTools',
-      allowed
-    ]
+    if (cfg.toolAccess === 'readonly') {
+      // Read-only, plus exactly one command that can write — the comment script.
+      // In print mode anything outside the allowlist is denied rather than
+      // prompting, so this is a hard boundary, not a suggestion. It also means
+      // no MCP servers: they load and appear in the tool list, then deny.
+      args.push(
+        '--allowedTools',
+        [
+          'Read',
+          'Grep',
+          'Glob',
+          'Bash(git log:*)',
+          'Bash(git diff:*)',
+          'Bash(git show:*)',
+          'Bash(git status:*)',
+          'Bash(git blame:*)',
+          `Bash(python3 ${script}:*)`
+        ].join(' ')
+      )
+    } else {
+      // Everything the config directory provides — tools, skills, MCP servers —
+      // matching what the same persona can do in a terminal or an IDE.
+      //
+      // bypassPermissions is what makes that true rather than nominal: headless
+      // runs auto-deny anything that would otherwise prompt, and there is nobody
+      // to answer. Without it the MCP servers still load and still refuse, which
+      // reads as "the tool is broken" rather than "permission was never granted".
+      args.push('--permission-mode', 'bypassPermissions')
+    }
     if (cfg.model) args.push('--model', cfg.model)
 
     return new Promise((resolve, reject) => {

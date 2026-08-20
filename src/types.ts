@@ -146,6 +146,15 @@ export interface ClaudeSettings {
   assignee: string
   /** Model alias, e.g. 'sonnet'. Empty = whatever the config dir's settings say. */
   model: string
+  /**
+   * 'full' — the agent gets everything the config directory gives it: all tools,
+   * skills and MCP servers, same as running it yourself in a terminal. Needs
+   * bypassPermissions, because headless runs auto-deny anything that would
+   * otherwise prompt, and nobody is there to answer.
+   * 'readonly' — a fixed allowlist: reads, searches, read-only git, and the
+   * comment script. Cannot reach MCP servers.
+   */
+  toolAccess: 'full' | 'readonly'
   timeoutMinutes: number
   /** Run automatically when the agent is added as an assignee, not just on demand. */
   autoRunOnAssign: boolean
@@ -215,6 +224,7 @@ export const DEFAULT_CLAUDE_SETTINGS: ClaudeSettings = {
   configDir: '',
   assignee: 'claude-zixi',
   model: '',
+  toolAccess: 'full',
   timeoutMinutes: 15,
   autoRunOnAssign: true,
   repoPaths: {}

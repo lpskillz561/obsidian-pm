@@ -520,13 +520,17 @@ export class PMSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Model')
-      .setDesc('Leave empty to use whatever the config directory is set to.')
+      .setDesc(
+        'Config default follows the config directory, which is the safest choice — it already carries the ' +
+          'context window you picked there. Plain opus is the 200k build, not the 1m one.'
+      )
       .addDropdown((dd) =>
         dd
           .addOption('', 'Config default')
           .addOption('haiku', 'Haiku')
           .addOption('sonnet', 'Sonnet')
-          .addOption('opus', 'Opus')
+          .addOption('opus', 'Opus (200k)')
+          .addOption('opus[1m]', 'Opus (1m context)')
           .setValue(claude.model)
           .onChange(async (v) => {
             claude.model = v

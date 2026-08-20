@@ -572,3 +572,90 @@ input.pm-pop-field:focus {
   outline: 2px solid var(--interactive-accent);
   outline-offset: -1px;
 }
+
+/* ── Comments ─────────────────────────────────────────────────────────────── */
+
+.pm-comment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pm-comment-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 2px 0 6px;
+}
+
+.pm-comment {
+  border-left: 2px solid var(--pm-ghost-border);
+  padding: 2px 0 2px 10px;
+}
+
+/* Agent comments carry the same blue the running card uses, so the thread
+   reads at a glance as "who said this" without a label. */
+.pm-comment--agent {
+  border-left-color: var(--color-blue);
+}
+
+.pm-comment-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.pm-comment-author {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.pm-comment-when {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.pm-comment-body {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* The agent writes multi-paragraph markdown; keep it from ballooning the
+   editor with default heading and paragraph margins. */
+.pm-comment-body > :first-child {
+  margin-top: 0;
+}
+.pm-comment-body > :last-child {
+  margin-bottom: 0;
+}
+.pm-comment-body p {
+  margin: 0 0 6px;
+}
+.pm-comment-body pre {
+  font-size: 12px;
+}
+
+.pm-comment-composer {
+  margin-top: 10px;
+}
+
+.pm-comment-input {
+  width: 100%;
+  resize: vertical;
+  min-height: 46px;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.pm-comment-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+
+.pm-comment-submit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}

@@ -19,6 +19,7 @@ import { confirmDialog } from '../ui/ModalFactory'
 import { renderTaskFormFields } from './TaskFormFields'
 import { renderTimeTrackingPanel } from './TimeTrackingPanel'
 import { renderSubtasksPanel } from './SubtasksPanel'
+import { renderCommentsPanel, type CommentsPanelHandle } from './CommentsPanel'
 import { NoteLinkSuggest } from './NoteLinkSuggest'
 
 export class TaskModal extends Modal {
@@ -33,6 +34,7 @@ export class TaskModal extends Modal {
   private noteSuggest: NoteLinkSuggest | null = null
   private shownExtras = new Set<string>()
   private saveKeyHandler: ((e: KeyboardEvent) => void) | null = null
+  private commentsPanel: CommentsPanelHandle | null = null
 
   constructor(
     app: App,
@@ -100,6 +102,8 @@ export class TaskModal extends Modal {
       this.modalEl.removeEventListener('keydown', this.saveKeyHandler)
       this.saveKeyHandler = null
     }
+    this.commentsPanel?.destroy()
+    this.commentsPanel = null
     this.noteSuggest?.destroy()
     this.noteSuggest = null
     this.contentEl.empty()
@@ -517,6 +521,14 @@ export class TaskModal extends Modal {
 
     // ── Time tracking ─────────────────────────────────────────────────────────
     renderTimeTrackingPanel(body, this.task)
+
+    // ── Comments ────────────────────────────────────────────────────────────
+    // Not for unsaved tasks: a comment is appended to the note file, and there
+    // is no file until the first save.
+    if (!this.isNew && this.task.filePath) {
+      this.commentsPanel?.destroy()
+      this.commentsPanel = renderCommentsPanel(body, this.task, this.plugin, sourcePath)
+    }
 
     // ── Footer ──────────────────────────────────────────────────────────────
     const footer = contentEl.createDiv('pm-te-footer')

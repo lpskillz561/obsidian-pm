@@ -23,7 +23,7 @@ import {
   updateTaskInTree
 } from './TaskTreeOps'
 import { hydrateProjectFromFrontmatter, hydrateTaskFromFile, hydrateTasks } from './YamlHydrator'
-import { FRONTMATTER_KEY, TASK_FRONTMATTER_KEY, parseFrontmatter, parseTaskBody } from './YamlParser'
+import { COMMENTS_HEADING, FRONTMATTER_KEY, TASK_FRONTMATTER_KEY, parseFrontmatter, parseTaskBody } from './YamlParser'
 import {
   buildTaskFrontmatter,
   serializeProject,
@@ -72,6 +72,25 @@ function applyBody(task: Task, body: string): void {
  */
 function adoptDiskComments(task: Task, comments: TaskComment[]): void {
   task.comments = comments
+}
+
+/**
+ * Local time with an explicit offset, e.g. 2026-08-19T20:58:01-04:00.
+ *
+ * Matches the format the agent's pm_comment.py writes, which the comment parser
+ * requires — it reads the timestamp as a single non-whitespace token, so
+ * `toISOString()`'s UTC `Z` form would parse but would silently misreport every
+ * agent comment's local time.
+ */
+function localIsoTimestamp(): string {
+  const d = new Date()
+  const pad = (n: number): string => String(n).padStart(2, '0')
+  const offsetMinutes = -d.getTimezoneOffset()
+  const sign = offsetMinutes >= 0 ? '+' : '-'
+  const abs = Math.abs(offsetMinutes)
+  const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  return `${date}T${time}${sign}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`
 }
 
 /** A basename of this exact length that prefixes the title's slug is kept as-is. */
@@ -479,8 +498,36 @@ export class ProjectStore {
     if (!task.filePath) return
     const file = this.app.vault.getAbstractFileByPath(task.filePath)
     if (!(file instanceof TFile)) return
-    applyBody(task, parseFrontmatter(await this.app.vault.read(file)).body)
+    // cachedRead, not read: Obsidian drops its cache entry on modify, so this is
+    // still current, and the editor opens without a disk hit on the common path.
+    applyBody(task, parseFrontmatter(await this.app.vault.cachedRead(file)).body)
     this.hydratedBodies.add(task)
+  }
+
+  /**
+   * Append a comment to a task note and re-read it.
+   *
+   * Writes straight to the file rather than going through the normal save path,
+   * because the comments section is owned by whoever appends to it — the agent's
+   * script does exactly this. Routing a comment through `updateTask` would lose
+   * it: a body rewrite adopts the comments on disk (see adoptDiskComments).
+   */
+  async appendComment(task: Task, author: string, body: string): Promise<void> {
+    const text = body.trim()
+    if (!text) return
+    if (!task.filePath) throw new Error('This task has no file yet. Save it first.')
+    const file = this.app.vault.getAbstractFileByPath(task.filePath)
+    if (!(file instanceof TFile)) throw new Error(`Cannot find ${task.filePath}`)
+
+    const entry = `### ${author} — ${localIsoTimestamp()}\n\n${text}\n`
+    this.markSelfWrite(task.filePath)
+    await this.app.vault.process(file, (content) => {
+      const trimmed = content.replace(/\n+$/, '')
+      return content.includes(COMMENTS_HEADING)
+        ? `${trimmed}\n\n${entry}`
+        : `${trimmed}\n\n${COMMENTS_HEADING}\n\n${entry}`
+    })
+    await this.reloadTaskBody(task)
   }
 
   /** Same as loadTaskBody but for the project file's body. */

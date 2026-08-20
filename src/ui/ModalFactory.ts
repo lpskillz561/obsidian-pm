@@ -235,12 +235,17 @@ export function openTaskModal(plugin: PMPlugin, project: Project, opts: OpenTask
     ).open()
   }
   // Tasks loaded via metadataCache have an empty description until the file
-  // body is read. Pre-load (no-op if already hydrated) so the modal renders the
-  // real description in one paint.
+  // body is read. Pre-load so the modal renders the real description in one paint.
+  //
+  // Re-read rather than load-if-missing: comments are appended to the note from
+  // outside the plugin (the agent's script does it directly), so a task already
+  // marked hydrated can still be holding a body that predates them. Without
+  // this, a run that finished while the board was open shows no comments.
   if (opts.task) {
     const task = opts.task
     void (async () => {
-      await plugin.store.loadTaskBody(task)
+      if (task.filePath) await plugin.store.reloadTaskBody(task)
+      else await plugin.store.loadTaskBody(task)
       open()
     })()
   } else {

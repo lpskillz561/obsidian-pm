@@ -162,10 +162,20 @@
   white-space: nowrap;
 }
 
-/* Agent run badge. The pulse is the only signal that a run is still alive —
-   the process is out of band, so there is nothing else to watch. */
+/* Agent run state. The pulse is the only signal that a run is still alive —
+   the process is out of band, so there is nothing else to watch. The whole card
+   carries it so a run is findable across a full board, not just the chip. */
 .pm-agent-chip--running {
   animation: pm-agent-pulse 1.6s ease-in-out infinite;
+}
+
+.pm-kanban-card--agent-running {
+  border-color: var(--color-blue);
+  animation: pm-agent-card-pulse 1.6s ease-in-out infinite;
+}
+
+.pm-kanban-card--agent-error {
+  border-color: var(--color-red);
 }
 
 @keyframes pm-agent-pulse {
@@ -178,8 +188,24 @@
   }
 }
 
+@keyframes pm-agent-card-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-blue) 40%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-blue) 18%, transparent);
+  }
+}
+
+/* Respect the OS setting: keep the colour, drop the motion. A pulsing card is
+   an accessibility problem for some people, a blue border is not. */
 @media (prefers-reduced-motion: reduce) {
-  .pm-agent-chip--running {
+  .pm-agent-chip--running,
+  .pm-kanban-card--agent-running {
     animation: none;
+  }
+  .pm-kanban-card--agent-running {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-blue) 25%, transparent);
   }
 }

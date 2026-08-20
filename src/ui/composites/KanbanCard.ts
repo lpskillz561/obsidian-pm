@@ -32,6 +32,15 @@ export class KanbanCard {
     card.dataset.taskId = task.id
     this.el = card
 
+    // The whole card carries the run state, not just the chip. A card mid-run
+    // needs to be findable from across a full board, and a small chip in the
+    // title row is not.
+    if (props.agentState) {
+      card.addClass(
+        props.agentState.phase === 'running' ? 'pm-kanban-card--agent-running' : 'pm-kanban-card--agent-error'
+      )
+    }
+
     if (props.priorityColor) {
       const priorityBar = card.createDiv('pm-kanban-card-priority-bar')
       priorityBar.setCssStyles({ background: props.priorityColor })

@@ -62,15 +62,11 @@ export class KanbanColumn {
     cardsEl.dataset.status = props.status.id
 
     for (const card of props.cards) {
+      // Spread the data rather than copying field by field: this list silently
+      // dropped `agentState` when it was added, and the optional type meant the
+      // compiler had nothing to complain about.
       new KanbanCard(cardsEl, {
-        task: card.task,
-        priorityColor: card.priorityColor,
-        descriptionPreview: card.descriptionPreview,
-        parentTitle: card.parentTitle,
-        subtaskProgress: card.subtaskProgress,
-        loggedHours: card.loggedHours,
-        overdue: card.overdue,
-        showTagColors: card.showTagColors,
+        ...card,
         onClick: () => props.onCardClick(card.task),
         onContextMenu: (e) => props.onCardContextMenu(card.task, e),
         onDragStart: () => props.onCardDragStart(card.task),
